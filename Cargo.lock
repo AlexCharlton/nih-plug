@@ -2471,7 +2471,7 @@ dependencies = [
  "nih_plug_derive",
  "objc",
  "parking_lot 0.12.1",
- "raw-window-handle 0.4.3",
+ "raw-window-handle 0.5.0",
  "rtrb",
  "serde",
  "serde_json",
