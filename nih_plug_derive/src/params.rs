@@ -255,7 +255,7 @@ pub fn derive_params(input: TokenStream) -> TokenStream {
 
         quote! {
             // This may not be in scope otherwise, used to call .as_ptr()
-            use ::nih_plug::params::Param;
+            use nih_plug::params::Param;
 
             #[allow(unused_mut)]
             let mut param_map = Vec::new();
@@ -276,15 +276,15 @@ pub fn derive_params(input: TokenStream) -> TokenStream {
                 .map(|PersistentField { field, key }| {
                     (
                         quote! {
-                            match ::nih_plug::params::persist::PersistentField::map(
+                            match nih_plug::params::persist::PersistentField::map(
                                 &self.#field,
-                                ::nih_plug::params::persist::serialize_field,
+                                nih_plug::params::persist::serialize_field,
                             ) {
                                 Ok(data) => {
                                     serialized.insert(String::from(#key), data);
                                 }
                                 Err(err) => {
-                                    ::nih_plug::nih_debug_assert_failure!(
+                                    nih_plug::nih_debug_assert_failure!(
                                         "Could not serialize '{}': {}",
                                         #key,
                                         err
@@ -294,15 +294,15 @@ pub fn derive_params(input: TokenStream) -> TokenStream {
                         },
                         quote! {
                             #key => {
-                                match ::nih_plug::params::persist::deserialize_field(&data) {
+                                match nih_plug::params::persist::deserialize_field(&data) {
                                     Ok(deserialized) => {
-                                        ::nih_plug::params::persist::PersistentField::set(
+                                        nih_plug::params::persist::PersistentField::set(
                                             &self.#field,
                                             deserialized,
                                         );
                                     }
                                     Err(err) => {
-                                        ::nih_plug::nih_debug_assert_failure!(
+                                        nih_plug::nih_debug_assert_failure!(
                                             "Could not deserialize '{}': {}",
                                             #key,
                                             err
@@ -398,7 +398,7 @@ pub fn derive_params(input: TokenStream) -> TokenStream {
             for (field_name, data) in serialized {
                 match field_name.as_str() {
                     #(#deserialize_fields_match_self_tokens)*
-                    _ => ::nih_plug::nih_debug_assert_failure!("Unknown serialized field name: {} (this may not be accurate)", field_name),
+                    _ => nih_plug::nih_debug_assert_failure!("Unknown serialized field name: {} (this may not be accurate)", field_name),
                 }
             }
 
