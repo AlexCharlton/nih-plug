@@ -327,14 +327,7 @@ impl<P: Plugin, B: Backend<P>> Wrapper<P, B> {
             Some(editor) => {
                 let context = self.clone().make_gui_context();
 
-                // DPI scaling should not be used on macOS since the OS handles it there
-                #[cfg(target_os = "macos")]
                 let scaling_policy = baseview::WindowScalePolicy::SystemScaleFactor;
-                #[cfg(not(target_os = "macos"))]
-                let scaling_policy = {
-                    editor.lock().set_scale_factor(self.config.dpi_scale);
-                    baseview::WindowScalePolicy::ScaleFactor(self.config.dpi_scale as f64)
-                };
 
                 let (width, height) = editor.lock().size();
                 Window::open_blocking(
