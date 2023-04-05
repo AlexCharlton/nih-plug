@@ -345,7 +345,6 @@ impl<P: Plugin, B: Backend<P>> Wrapper<P, B> {
                             height: height as f64,
                         },
                         scale: scaling_policy,
-                        gl_config: None,
                     },
                     move |window| {
                         // TODO: This spawn function should be able to fail and return an error, but

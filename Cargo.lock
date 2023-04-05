@@ -402,6 +402,24 @@ dependencies = [
 [[package]]
 name = "baseview"
 version = "0.1.0"
+source = "git+https://github.com/AlexCharlton/baseview.git#8ba63dfaa57c276dd7edabe4bc68c3ff3533aafe"
+dependencies = [
+ "cocoa",
+ "core-foundation",
+ "keyboard-types",
+ "nix 0.22.3",
+ "objc",
+ "raw-window-handle 0.5.0",
+ "uuid",
+ "winapi",
+ "x11",
+ "xcb 0.9.0",
+ "xcb-util",
+]
+
+[[package]]
+name = "baseview"
+version = "0.1.0"
 source = "git+https://github.com/RustAudio/baseview.git#c129b12ead4f5ac02126f559ceb8ce43cc982200"
 dependencies = [
  "cocoa",
@@ -2453,7 +2471,7 @@ dependencies = [
  "atomic_float",
  "atomic_refcell",
  "backtrace",
- "baseview 0.1.0 (git+https://github.com/RustAudio/baseview.git?rev=7001c2521fa1a439a01967cb881b411cd75d9ee0)",
+ "baseview 0.1.0 (git+https://github.com/AlexCharlton/baseview.git)",
  "bitflags",
  "cfg-if 1.0.0",
  "clap",
