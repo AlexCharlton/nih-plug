@@ -26,12 +26,12 @@ macro_rules! nih_export_clap {
 
             // We don't use generics inside of statics, so this lazy_static is used as kind of an
             // escape hatch
-            ::nih_plug::wrapper::clap::lazy_static! {
-                static ref FACTORY: ::nih_plug::wrapper::clap::Factory<$plugin_ty> = ::nih_plug::wrapper::clap::Factory::default();
+            $crate::wrapper::clap::lazy_static! {
+                static ref FACTORY: $crate::wrapper::clap::Factory<$plugin_ty> = $crate::wrapper::clap::Factory::default();
             }
 
             pub extern "C" fn init(_plugin_path: *const ::std::os::raw::c_char) -> bool {
-                ::nih_plug::wrapper::setup_logger();
+                $crate::wrapper::setup_logger();
                 true
             }
 
@@ -42,7 +42,7 @@ macro_rules! nih_export_clap {
             ) -> *const ::std::ffi::c_void {
                 if !factory_id.is_null()
                     && unsafe { ::std::ffi::CStr::from_ptr(factory_id) }
-                        == ::nih_plug::wrapper::clap::CLAP_PLUGIN_FACTORY_ID
+                        == $crate::wrapper::clap::CLAP_PLUGIN_FACTORY_ID
                 {
                     &(*FACTORY).clap_plugin_factory as *const _ as *const ::std::ffi::c_void
                 } else {
@@ -54,9 +54,9 @@ macro_rules! nih_export_clap {
         /// The CLAP plugin's entry point.
         #[no_mangle]
         #[used]
-        pub static clap_entry: ::nih_plug::wrapper::clap::clap_plugin_entry =
-            ::nih_plug::wrapper::clap::clap_plugin_entry {
-                clap_version: ::nih_plug::wrapper::clap::CLAP_VERSION,
+        pub static clap_entry: $crate::wrapper::clap::clap_plugin_entry =
+            $crate::wrapper::clap::clap_plugin_entry {
+                clap_version: $crate::wrapper::clap::CLAP_VERSION,
                 init: Some(self::clap::init),
                 deinit: Some(self::clap::deinit),
                 get_factory: Some(self::clap::get_factory),
