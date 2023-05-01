@@ -337,6 +337,7 @@ impl<P: Plugin, B: Backend<P>> Wrapper<P, B> {
                             width: width as f64,
                             height: height as f64,
                         },
+                        resizable: false,
                         scale: scaling_policy,
                         drop_target_valid: None,
                     },
