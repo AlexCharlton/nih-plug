@@ -402,7 +402,7 @@ dependencies = [
 [[package]]
 name = "baseview"
 version = "0.1.0"
-source = "git+https://github.com/AlexCharlton/baseview.git#0c938804c471774a07f2264ba565481c9d5f2873"
+source = "git+https://github.com/AlexCharlton/baseview.git#01923a714eea9b3fcbe32c4f89fcc77fad453d39"
 dependencies = [
  "cocoa",
  "core-foundation",
