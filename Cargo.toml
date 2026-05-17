@@ -2,7 +2,7 @@
 name = "nih_plug"
 version = "0.0.0"
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.80"
 authors = ["Robbert van der Helm <mail@robbertvanderhelm.nl>"]
 license = "ISC"
 
@@ -11,6 +11,7 @@ description = "A simple but modern API-agnostic audio plugin framework"
 repository = "https://github.com/robbert-vdh/nih-plug"
 
 [workspace]
+resolver = "2"
 members = [
   "nih_plug_derive",
   "nih_plug_egui",
@@ -21,6 +22,9 @@ members = [
   "cargo_nih_plug",
   "xtask",
 
+  "plugins/examples/byo_gui_gl",
+  "plugins/examples/byo_gui_softbuffer",
+  "plugins/examples/byo_gui_wgpu",
   "plugins/examples/gain",
   "plugins/examples/gain_gui_egui",
   "plugins/examples/gain_gui_iced",
@@ -31,6 +35,7 @@ members = [
   "plugins/examples/stft",
   "plugins/examples/sysex",
 
+  "plugins/soft_vacuum",
   "plugins/buffr_glitch",
   "plugins/crisp",
   "plugins/crossover",
@@ -67,25 +72,25 @@ simd = []
 # compatibility.
 zstd = ["dep:zstd"]
 
-# Only relevant when generating docs, adds the `doc_auto_cfg` nightly feature
+# Only relevant when generating docs, adds the `doc_cfg` nightly feature
 docs = []
 
 [dependencies]
 nih_plug_derive = { path = "nih_plug_derive" }
 
 anyhow = "1.0"
-anymap = "0.12.1"
+anymap3 = "1.0.1"
 atomic_float = "0.1"
 atomic_refcell = "0.1"
 backtrace = "0.3.65"
 bitflags = "1.3"
 cfg-if = "1.0"
-clap-sys = "0.3"
+# This supports CLAP 1.2.2
+clap-sys = {  git = "https://github.com/micahrj/clap-sys.git", rev = "25d7f53fdb6363ad63fbd80049cb7a42a97ac156" }
 crossbeam = "0.8"
-lazy_static = "1.4"
 log = { version = "0.4", features = ["std", "release_max_level_info"] }
 midi-consts = "0.1"
-nih_log = "0.3.0"
+nih_log = "0.3.1"
 parking_lot = "0.12"
 raw-window-handle = "0.5"
 serde = { version = "1.0", features = ["derive"] }

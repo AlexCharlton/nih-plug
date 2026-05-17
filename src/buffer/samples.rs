@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 #[cfg(feature = "simd")]
-use std::simd::{LaneCount, Simd, SupportedLaneCount};
+use std::simd::Simd;
 
 /// An iterator over all samples in a buffer or block, yielding iterators over each channel for
 /// every sample. This iteration order offers good cache locality for per-sample access.
@@ -87,12 +87,12 @@ impl<'slice, 'sample> Iterator for ChannelSamplesIter<'slice, 'sample> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_channel < unsafe { (*self.buffers).len() } {
+        if self.current_channel < unsafe { (&(*self.buffers)).len() } {
             // SAFETY: These bounds have already been checked
             // SAFETY: It is also not possible to have multiple mutable references to the same
             // sample at the same time
             let sample = unsafe {
-                (*self.buffers)
+                (&mut (*self.buffers))
                     .get_unchecked_mut(self.current_channel)
                     .get_unchecked_mut(self.current_sample)
             };
@@ -107,7 +107,7 @@ impl<'slice, 'sample> Iterator for ChannelSamplesIter<'slice, 'sample> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = unsafe { (*self.buffers).len() } - self.current_channel;
+        let remaining = unsafe { (&(*self.buffers)).len() } - self.current_channel;
 
         (remaining, Some(remaining))
     }
@@ -121,7 +121,7 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
     #[allow(clippy::len_without_is_empty)]
     #[inline]
     pub fn len(&self) -> usize {
-        unsafe { (*self.buffers).len() }
+        unsafe { (&(*self.buffers)).len() }
     }
 
     /// A resetting iterator. This lets you iterate over the same channels multiple times. Otherwise
@@ -144,7 +144,7 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
         // SAFETY: The sample bound has already been checked
         unsafe {
             Some(
-                (*self.buffers)
+                (&mut (*self.buffers))
                     .get_mut(channel_index)?
                     .get_unchecked_mut(self.current_sample),
             )
@@ -158,7 +158,7 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
     /// `channel_index` must be in the range `0..Self::len()`.
     #[inline]
     pub unsafe fn get_unchecked_mut(&mut self, channel_index: usize) -> &mut f32 {
-        (*self.buffers)
+        (&mut (*self.buffers))
             .get_unchecked_mut(channel_index)
             .get_unchecked_mut(self.current_sample)
     }
@@ -168,15 +168,12 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
     /// all values.
     #[cfg(feature = "simd")]
     #[inline]
-    pub fn to_simd<const LANES: usize>(&self) -> Simd<f32, LANES>
-    where
-        LaneCount<LANES>: SupportedLaneCount,
-    {
+    pub fn to_simd<const LANES: usize>(&self) -> Simd<f32, LANES> {
         let used_lanes = self.len().max(LANES);
         let mut values = [0.0; LANES];
         for (channel_idx, value) in values.iter_mut().enumerate().take(used_lanes) {
             *value = unsafe {
-                *(*self.buffers)
+                *(&(*self.buffers))
                     .get_unchecked(channel_idx)
                     .get_unchecked(self.current_sample)
             };
@@ -193,13 +190,10 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
     /// Undefined behavior if `LANES > channels.len()`.
     #[cfg(feature = "simd")]
     #[inline]
-    pub unsafe fn to_simd_unchecked<const LANES: usize>(&self) -> Simd<f32, LANES>
-    where
-        LaneCount<LANES>: SupportedLaneCount,
-    {
+    pub unsafe fn to_simd_unchecked<const LANES: usize>(&self) -> Simd<f32, LANES> {
         let mut values = [0.0; LANES];
         for (channel_idx, value) in values.iter_mut().enumerate() {
-            *value = *(*self.buffers)
+            *value = *(&(*self.buffers))
                 .get_unchecked(channel_idx)
                 .get_unchecked(self.current_sample);
         }
@@ -212,15 +206,12 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
     #[cfg(feature = "simd")]
     #[allow(clippy::wrong_self_convention)]
     #[inline]
-    pub fn from_simd<const LANES: usize>(&mut self, vector: Simd<f32, LANES>)
-    where
-        LaneCount<LANES>: SupportedLaneCount,
-    {
+    pub fn from_simd<const LANES: usize>(&mut self, vector: Simd<f32, LANES>) {
         let used_lanes = self.len().max(LANES);
         let values = vector.to_array();
         for (channel_idx, value) in values.into_iter().enumerate().take(used_lanes) {
             *unsafe {
-                (*self.buffers)
+                (&mut (*self.buffers))
                     .get_unchecked_mut(channel_idx)
                     .get_unchecked_mut(self.current_sample)
             } = value;
@@ -236,13 +227,10 @@ impl<'slice, 'sample> ChannelSamples<'slice, 'sample> {
     #[cfg(feature = "simd")]
     #[allow(clippy::wrong_self_convention)]
     #[inline]
-    pub unsafe fn from_simd_unchecked<const LANES: usize>(&mut self, vector: Simd<f32, LANES>)
-    where
-        LaneCount<LANES>: SupportedLaneCount,
-    {
+    pub unsafe fn from_simd_unchecked<const LANES: usize>(&mut self, vector: Simd<f32, LANES>) {
         let values = vector.to_array();
         for (channel_idx, value) in values.into_iter().enumerate() {
-            *(*self.buffers)
+            *(&mut (*self.buffers))
                 .get_unchecked_mut(channel_idx)
                 .get_unchecked_mut(self.current_sample) = value;
         }

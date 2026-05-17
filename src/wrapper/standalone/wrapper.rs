@@ -13,15 +13,12 @@ use std::thread;
 use super::backend::Backend;
 use super::config::WrapperConfig;
 use super::context::{WrapperGuiContext, WrapperInitContext, WrapperProcessContext};
-use crate::audio_setup::{AudioIOLayout, BufferConfig, ProcessMode};
-use crate::context::gui::AsyncExecutor;
-use crate::context::process::Transport;
-use crate::editor::{Editor, ParentWindowHandle};
 use crate::event_loop::{EventLoop, MainThreadExecutor, OsEventLoop};
-use crate::midi::PluginNoteEvent;
-use crate::params::internals::ParamPtr;
-use crate::params::{ParamFlags, Params};
-use crate::plugin::{Plugin, ProcessStatus, TaskExecutor};
+use crate::prelude::{
+    AsyncExecutor, AudioIOLayout, BufferConfig, Editor, ParamFlags, ParamPtr, Params,
+    ParentWindowHandle, Plugin, PluginNoteEvent, ProcessMode, ProcessStatus, TaskExecutor,
+    Transport,
+};
 use crate::util::permit_alloc;
 use crate::wrapper::state::{self, PluginState};
 use crate::wrapper::util::process_wrapper;
@@ -184,7 +181,7 @@ impl<P: Plugin, B: Backend<P>> Wrapper<P, B> {
         //       the config itself. Right now clap doesn't support this.
         let audio_io_layout = config.audio_io_layout_or_exit::<P>();
 
-        let plugin = P::default();
+        let mut plugin = P::default();
         let task_executor = Mutex::new(plugin.task_executor());
         let params = plugin.params();
 
@@ -342,16 +339,27 @@ impl<P: Plugin, B: Backend<P>> Wrapper<P, B> {
                         drop_target_valid: None,
                     },
                     move |window| {
+                        let parent_handle = match window.raw_window_handle() {
+                            raw_window_handle::RawWindowHandle::Xlib(handle) => {
+                                ParentWindowHandle::X11Window(handle.window as u32)
+                            }
+                            raw_window_handle::RawWindowHandle::Xcb(handle) => {
+                                ParentWindowHandle::X11Window(handle.window)
+                            }
+                            raw_window_handle::RawWindowHandle::AppKit(handle) => {
+                                ParentWindowHandle::AppKitNsView(handle.ns_view)
+                            }
+                            raw_window_handle::RawWindowHandle::Win32(handle) => {
+                                ParentWindowHandle::Win32Hwnd(handle.hwnd)
+                            }
+                            handle => unimplemented!("Unsupported window handle: {handle:?}"),
+                        };
+
                         // TODO: This spawn function should be able to fail and return an error, but
                         //       baseview does not support this yet. Once this is added, we should
                         //       immediately close the parent window when this happens so the loop
                         //       can exit.
-                        let editor_handle = editor.lock().spawn(
-                            ParentWindowHandle {
-                                handle: window.raw_window_handle(),
-                            },
-                            context,
-                        );
+                        let editor_handle = editor.lock().spawn(parent_handle, context);
 
                         WrapperWindowHandler {
                             _editor_handle: editor_handle,

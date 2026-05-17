@@ -1,5 +1,5 @@
 // Crisp: a distortion plugin but not quite
-// Copyright (C) 2022-2023 Robbert van der Helm
+// Copyright (C) 2022-2024 Robbert van der Helm
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -317,7 +317,7 @@ impl Plugin for Crisp {
         self.params.clone()
     }
 
-    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         editor::create(self.params.clone(), self.params.editor_state.clone())
     }
 

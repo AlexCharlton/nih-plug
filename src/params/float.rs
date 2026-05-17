@@ -269,6 +269,8 @@ impl FloatParam {
     /// Build a new [`FloatParam`]. Use the other associated functions to modify the behavior of the
     /// parameter.
     pub fn new(name: impl Into<String>, default: f32, range: FloatRange) -> Self {
+        range.assert_validity();
+
         Self {
             value: AtomicF32::new(default),
             normalized_value: AtomicF32::new(range.normalize(default)),
@@ -296,6 +298,12 @@ impl FloatParam {
     #[inline]
     pub fn value(&self) -> f32 {
         self.modulated_plain_value()
+    }
+
+    /// The range of valid plain values for this parameter.
+    #[inline]
+    pub fn range(&self) -> FloatRange {
+        self.range
     }
 
     /// Enable polyphonic modulation for this parameter. The ID is used to uniquely identify this
@@ -355,7 +363,7 @@ impl FloatParam {
         self
     }
 
-    /// Set the distance between steps of a [FloatParam]. Mostly useful for quantizing GUI input. If
+    /// Set the distance between steps of a [`FloatParam`]. Mostly useful for quantizing GUI input. If
     /// this is set and a [`value_to_string`][Self::with_value_to_string()] function is not set,
     /// then this is also used when formatting the parameter. This must be a positive, nonzero
     /// number.

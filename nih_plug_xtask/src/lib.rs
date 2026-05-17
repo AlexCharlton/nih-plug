@@ -14,9 +14,6 @@ mod util;
 /// Re-export for the main function.
 pub use anyhow::Result;
 
-/// The base directory for the bundler's output.
-const BUNDLE_HOME: &str = "target/bundled";
-
 fn build_usage_string(command_name: &str) -> String {
     format!(
         "Usage:
@@ -55,6 +52,7 @@ pub enum CompilationTarget {
 pub enum Architecture {
     X86,
     X86_64,
+    RISCV64,
     // There are also a ton of different 32-bit ARM architectures, we'll just pretend they don't
     // exist for now
     AArch64,
@@ -78,6 +76,11 @@ pub fn main() -> Result<()> {
 /// `std::env::args()` before passing it to this function.
 pub fn main_with_args(command_name: &str, args: impl IntoIterator<Item = String>) -> Result<()> {
     chdir_workspace_root()?;
+    let cargo_metadata = cargo_metadata::MetadataCommand::new()
+        .manifest_path("./Cargo.toml")
+        .exec()
+        .context("Could not parse `cargo-metadata`")?;
+    let target_dir = cargo_metadata.target_directory.as_std_path();
 
     let mut args = args.into_iter();
     let usage_string = build_usage_string(command_name);
@@ -95,9 +98,9 @@ pub fn main_with_args(command_name: &str, args: impl IntoIterator<Item = String>
             // As explained above, for efficiency's sake this is a two step process
             build(&packages, &other_args)?;
 
-            bundle(&packages[0], &other_args, false)?;
+            bundle(target_dir, &packages[0], &other_args, false)?;
             for package in packages.into_iter().skip(1) {
-                bundle(&package, &other_args, false)?;
+                bundle(target_dir, &package, &other_args, false)?;
             }
 
             Ok(())
@@ -133,9 +136,9 @@ pub fn main_with_args(command_name: &str, args: impl IntoIterator<Item = String>
 
             // This `true` indicates a universal build. This will cause the two sets of built
             // binaries to beq lipo'd together into universal binaries before bundling
-            bundle(&packages[0], &other_args, true)?;
+            bundle(target_dir, &packages[0], &other_args, true)?;
             for package in packages.into_iter().skip(1) {
-                bundle(&package, &other_args, true)?;
+                bundle(target_dir, &package, &other_args, true)?;
             }
 
             Ok(())
@@ -213,7 +216,7 @@ pub fn build(packages: &[String], args: &[String]) -> Result<()> {
 /// Normally this respects the `--target` option for cross compilation. If the `universal` option is
 /// specified instead, then this will assume both `x86_64-apple-darwin` and `aarch64-apple-darwin`
 /// have been built and it will try to lipo those together instead.
-pub fn bundle(package: &str, args: &[String], universal: bool) -> Result<()> {
+pub fn bundle(target_dir: &Path, package: &str, args: &[String], universal: bool) -> Result<()> {
     let mut build_type_dir = "debug";
     let mut cross_compile_target: Option<String> = None;
     for arg_idx in (0..args.len()).rev() {
@@ -251,7 +254,8 @@ pub fn bundle(package: &str, args: &[String], universal: bool) -> Result<()> {
     // We can bundle both library targets (for plugins) and binary targets (for standalone
     // applications)
     if universal {
-        let x86_64_target_base = target_base(Some("x86_64-apple-darwin"))?.join(build_type_dir);
+        let x86_64_target_base =
+            target_base(target_dir, Some("x86_64-apple-darwin"))?.join(build_type_dir);
         let x86_64_bin_path = x86_64_target_base.join(binary_basename(
             package,
             CompilationTarget::MacOS(Architecture::X86_64),
@@ -261,7 +265,8 @@ pub fn bundle(package: &str, args: &[String], universal: bool) -> Result<()> {
             CompilationTarget::MacOS(Architecture::X86_64),
         ));
 
-        let aarch64_target_base = target_base(Some("aarch64-apple-darwin"))?.join(build_type_dir);
+        let aarch64_target_base =
+            target_base(target_dir, Some("aarch64-apple-darwin"))?.join(build_type_dir);
         let aarch64_bin_path = aarch64_target_base.join(binary_basename(
             package,
             CompilationTarget::MacOS(Architecture::AArch64),
@@ -280,6 +285,7 @@ pub fn bundle(package: &str, args: &[String], universal: bool) -> Result<()> {
         eprintln!();
         if build_bin {
             bundle_binary(
+                target_dir,
                 package,
                 &[&x86_64_bin_path, &aarch64_bin_path],
                 CompilationTarget::MacOSUniversal,
@@ -287,6 +293,7 @@ pub fn bundle(package: &str, args: &[String], universal: bool) -> Result<()> {
         }
         if build_lib {
             bundle_plugin(
+                target_dir,
                 package,
                 &[&x86_64_lib_path, &aarch64_lib_path],
                 CompilationTarget::MacOSUniversal,
@@ -294,7 +301,8 @@ pub fn bundle(package: &str, args: &[String], universal: bool) -> Result<()> {
         }
     } else {
         let compilation_target = compilation_target(cross_compile_target.as_deref())?;
-        let target_base = target_base(cross_compile_target.as_deref())?.join(build_type_dir);
+        let target_base =
+            target_base(target_dir, cross_compile_target.as_deref())?.join(build_type_dir);
         let bin_path = target_base.join(binary_basename(package, compilation_target));
         let lib_path = target_base.join(library_basename(package, compilation_target));
         if !bin_path.exists() && !lib_path.exists() {
@@ -313,10 +321,10 @@ to your Cargo.toml file?"#,
 
         eprintln!();
         if bin_path.exists() {
-            bundle_binary(package, &[&bin_path], compilation_target)?;
+            bundle_binary(target_dir, package, &[&bin_path], compilation_target)?;
         }
         if lib_path.exists() {
-            bundle_plugin(package, &[&lib_path], compilation_target)?;
+            bundle_plugin(target_dir, package, &[&lib_path], compilation_target)?;
         }
     }
 
@@ -327,10 +335,12 @@ to your Cargo.toml file?"#,
 /// combined into a single binary using a method that depends on the compilation target. For
 /// universal macOS builds this uses lipo.
 fn bundle_binary(
+    target_dir: &Path,
     package: &str,
     bin_paths: &[&Path],
     compilation_target: CompilationTarget,
 ) -> Result<()> {
+    let bundle_home_dir = bundle_home(target_dir);
     let bundle_name = match load_bundler_config()?.and_then(|c| c.get(package).cloned()) {
         Some(PackageConfig { name: Some(name) }) => name,
         _ => package.to_string(),
@@ -339,7 +349,7 @@ fn bundle_binary(
     // On MacOS the standalone target needs to be in a bundle
     let standalone_bundle_binary_name =
         standalone_bundle_binary_name(&bundle_name, compilation_target);
-    let standalone_binary_path = Path::new(BUNDLE_HOME).join(&standalone_bundle_binary_name);
+    let standalone_binary_path = bundle_home_dir.join(&standalone_bundle_binary_name);
 
     fs::create_dir_all(standalone_binary_path.parent().unwrap())
         .context("Could not create standalone bundle directory")?;
@@ -362,7 +372,7 @@ fn bundle_binary(
         })?;
     }
 
-    let standalone_bundle_home = Path::new(BUNDLE_HOME).join(
+    let standalone_bundle_home = bundle_home_dir.join(
         Path::new(&standalone_bundle_binary_name)
             .components()
             .next()
@@ -389,10 +399,12 @@ fn bundle_binary(
 /// the libraries will be combined into a single library using a method that depends on the
 /// compilation target. For universal macOS builds this uses lipo.
 fn bundle_plugin(
+    target_dir: &Path,
     package: &str,
     lib_paths: &[&Path],
     compilation_target: CompilationTarget,
 ) -> Result<()> {
+    let bundle_home_dir = bundle_home(target_dir);
     let bundle_name = match load_bundler_config()?.and_then(|c| c.get(package).cloned()) {
         Some(PackageConfig { name: Some(name) }) => name,
         _ => package.to_string(),
@@ -418,7 +430,7 @@ fn bundle_plugin(
 
     if bundle_clap {
         let clap_bundle_library_name = clap_bundle_library_name(&bundle_name, compilation_target);
-        let clap_lib_path = Path::new(BUNDLE_HOME).join(&clap_bundle_library_name);
+        let clap_lib_path = bundle_home_dir.join(&clap_bundle_library_name);
 
         fs::create_dir_all(clap_lib_path.parent().unwrap())
             .context("Could not create CLAP bundle directory")?;
@@ -427,7 +439,7 @@ fn bundle_plugin(
 
         // In contrast to VST3, CLAP only uses bundles on macOS, so we'll just take the first
         // component of the library name instead
-        let clap_bundle_home = Path::new(BUNDLE_HOME).join(
+        let clap_bundle_home = bundle_home_dir.join(
             Path::new(&clap_bundle_library_name)
                 .components()
                 .next()
@@ -446,7 +458,7 @@ fn bundle_plugin(
     }
     if bundle_vst2 {
         let vst2_bundle_library_name = vst2_bundle_library_name(&bundle_name, compilation_target);
-        let vst2_lib_path = Path::new(BUNDLE_HOME).join(&vst2_bundle_library_name);
+        let vst2_lib_path = bundle_home_dir.join(&vst2_bundle_library_name);
 
         fs::create_dir_all(vst2_lib_path.parent().unwrap())
             .context("Could not create VST2 bundle directory")?;
@@ -455,7 +467,7 @@ fn bundle_plugin(
 
         // VST2 only uses bundles on macOS, so we'll just take the first component of the library
         // name instead
-        let vst2_bundle_home = Path::new(BUNDLE_HOME).join(
+        let vst2_bundle_home = bundle_home_dir.join(
             Path::new(&vst2_bundle_library_name)
                 .components()
                 .next()
@@ -474,7 +486,7 @@ fn bundle_plugin(
     }
     if bundle_vst3 {
         let vst3_lib_path =
-            Path::new(BUNDLE_HOME).join(vst3_bundle_library_name(&bundle_name, compilation_target));
+            bundle_home_dir.join(vst3_bundle_library_name(&bundle_name, compilation_target));
 
         fs::create_dir_all(vst3_lib_path.parent().unwrap())
             .context("Could not create VST3 bundle directory")?;
@@ -590,6 +602,8 @@ fn compilation_target(cross_compile_target: Option<&str>) -> Result<CompilationT
             let architecture = Architecture::X86_64;
             #[cfg(target_arch = "aarch64")]
             let architecture = Architecture::AArch64;
+            #[cfg(target_arch = "riscv64")]
+            let architecture = Architecture::RISCV64;
 
             #[cfg(target_os = "linux")]
             return Ok(CompilationTarget::Linux(architecture));
@@ -601,13 +615,18 @@ fn compilation_target(cross_compile_target: Option<&str>) -> Result<CompilationT
     }
 }
 
+/// The directory bundled plugins should be written to.
+fn bundle_home(target_directory: &Path) -> PathBuf {
+    target_directory.join("bundled")
+}
+
 /// The base directory for the compiled binaries. This does not use [`CompilationTarget`] as we need
 /// to be able to differentiate between native and cross-compilation.
-fn target_base(cross_compile_target: Option<&str>) -> Result<PathBuf> {
+fn target_base(target_directory: &Path, cross_compile_target: Option<&str>) -> Result<PathBuf> {
     match cross_compile_target {
         // Unhandled targets will already be handled in `compilation_target`
-        Some(target) => Ok(Path::new("target").join(target)),
-        None => Ok(PathBuf::from("target")),
+        Some(target) => Ok(target_directory.join(target)),
+        None => Ok(target_directory.to_owned()),
     }
 }
 
@@ -684,6 +703,9 @@ fn vst3_bundle_library_name(package: &str, target: CompilationTarget) -> String 
         CompilationTarget::Linux(Architecture::X86_64) => {
             format!("{package}.vst3/Contents/x86_64-linux/{package}.so")
         }
+        CompilationTarget::Linux(Architecture::RISCV64) => {
+            format!("{package}.vst3/Contents/riscv64-linux/{package}.so")
+        }
         CompilationTarget::Linux(Architecture::AArch64) => {
             format!("{package}.vst3/Contents/aarch64-linux/{package}.so")
         }
@@ -698,6 +720,9 @@ fn vst3_bundle_library_name(package: &str, target: CompilationTarget) -> String 
         }
         CompilationTarget::Windows(Architecture::AArch64) => {
             format!("{package}.vst3/Contents/arm_64-win/{package}.vst3")
+        }
+        CompilationTarget::Windows(Architecture::RISCV64) => {
+            panic!("riscv64 are not supported by windows currently!")
         }
     }
 }
