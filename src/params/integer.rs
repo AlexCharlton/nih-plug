@@ -249,6 +249,8 @@ impl IntParam {
     /// Build a new [`IntParam`]. Use the other associated functions to modify the behavior of the
     /// parameter.
     pub fn new(name: impl Into<String>, default: i32, range: IntRange) -> Self {
+        range.assert_validity();
+
         Self {
             value: AtomicI32::new(default),
             normalized_value: AtomicF32::new(range.normalize(default)),
@@ -275,6 +277,12 @@ impl IntParam {
     #[inline]
     pub fn value(&self) -> i32 {
         self.modulated_plain_value()
+    }
+
+    /// The range of valid plain values for this parameter.
+    #[inline]
+    pub fn range(&self) -> IntRange {
+        self.range
     }
 
     /// Enable polyphonic modulation for this parameter. The ID is used to uniquely identify this

@@ -10,6 +10,302 @@ Since there is no stable release yet, the changes are organized per day in
 reverse chronological order. The main purpose of this document in its current
 state is to list breaking changes.
 
+## [2025-02-23]
+
+### Breaking changes
+
+- `nih_plug_egui` now uses egui 0.31.
+
+### Added
+
+- `nih_plug_egui` has a new `ResizableWindow` widget that can be used to resize
+  the plugin's editor.
+
+### Changed
+
+- The CLAP bindings were updated to 1.2.2. The only noticeable difference is
+  that the remote controls exposed through `ClapPlugin::remote_controls()` now
+  use the non-draft extension.
+
+### Fixed
+
+- Fixed a warning about future name clashes when compiling `nih_plug`.
+
+## [2024-12-23]
+
+### Added
+
+- `nih_plug_vizia`'s `ParamSlider` has a new style that always shows the offset
+  relative to the center of the slider.
+
+## [2024-08-18]
+
+### Breaking changes
+
+- The minimum supported Rust version has been bumped to 1.80 to replace the last
+  uses of `lazy_static` with `std::sync::LazyLock`.
+
+## [2024-05-05]
+
+### Breaking changes
+
+- `nih_plug_egui` has been updated from egui 0.26.1 to egui 0.27.2.
+- `nih_plug_vizia` has been updated to the latest version with some a additional
+  patches. This includes a workaround for the problem where opening multiple
+  instances of a plugin's GUI on Windows or macOS would result in crashes.
+
+### Changed
+
+- Two byte slices are now accepted in `NoteEvent::from_midi()` if the event
+  doesn't use the third byte.
+
+### Fixed
+
+- Fixed a race condition in the VST3 GUI event loop on Linux. This could cause
+  panics with certain versions of Carla.
+- The CPAL backend now correctly handles situations where it receives fewer
+  samples than configured.
+- Fixed the handling of multichannel audio in the CPAL backend.
+
+## [2024-05-04]
+
+### Fixed
+
+- Fixed a soundness issue in the buffer management where in-place input/output
+  buffers may not have been recognized properly before.
+
+## [2024-03-23]
+
+### Added
+
+- `nih_plug_xtask` now detects and uses non-standard `target` directory
+  locations if overridden through Cargo's settings.
+
+## [2024-03-18]
+
+### Changed
+
+- (Keyboard) input events sent by the host through VST3's `IPlugView` interface
+  are now explicitly ignored. This may allow a couple more keyboard events to
+  reach through to plugin windows in hosts that use these.
+
+## [2024-02-23]
+
+### Fixed
+
+- Fixed `nih_plug_egui` panicking due to cursor icons not yet being implemented in baseview for MacOS and Windows.
+
+## [2024-02-22]
+
+### Breaking changes
+
+- `nih_plug_egui` has been updated from egui 0.22.0 to using egui 0.26.1.
+
+## [2023-12-30]
+
+### Breaking changes
+
+- `nih_plug_vizia` has been updated to the latest Vizia version. Vizia's styling
+  system has changed a lot since the last update, so plugin GUIs and stylesheets
+  may require small changes before they behave the same again. A summary of the
+  most important changes can be found in Vizia PR
+  [#291](https://github.com/vizia/vizia/pull/291). Some notable breaking changes
+  include:
+
+  - Font handling and choosing between different variations of the same font
+    (e.g. `Noto Sans` versus `Noto Sans Light` versus `Noto Sans Light Italic`)
+    works very differently now.
+  - `ResizeHandle` now needs to be the last element in a GUI because of changes
+    to Vizia's event targetting mechanism.
+
+- The `raw_window_handle` version used by NIH-plug has been updated to version
+  0.5.x.
+
+### Added
+
+- Added initial RISC-V support to `nih_plug_xtask`.
+  ([#95](https://github.com/robbert-vdh/nih-plug/pull/95)).
+
+### Changed
+
+- `ParentWindowHandle` has changed to be a sum type of different parent window
+  handle types, similar to `RawWindowHandle`. This makes it easier to use GUI
+  libraries that link against a different version of `raw_window_handle` than
+  the one used by NIH-plug itself by simply wrapping around
+  `ParentWindowHandle`.
+- `nih_debug_assert*!()` failures are now promoted to a warning instead of a
+  debug message. This makes the non-fatal debug assertion failures easier to
+  spot.
+- The minimum scale factor in `nih_plug_vizia` has changed from 0.25 to 0.5.
+  Vizia rounds things to single pixels, and below 0.5 scaling single pixel
+  borders would disappear when not using a HiDPI setup.
+
+### Fixed
+
+- Various `baseview` dependencies now have their versions pinned.
+
+## [2023-12-06]
+
+### Fixed
+
+- `nih_export_vst3!()` no longer requires `nih_debug_assert` to be in scope.
+
+## [2023-11-05]
+
+### Changed
+
+- `FloatParam` and `IntParam` ranges can now be accessed using methods on the
+  parameters ([#89](https://github.com/robbert-vdh/nih-plug/pull/89)).
+
+## [2023-09-21]
+
+### Fixed
+
+- Fixed null pointers assertions in the low level buffer management code not
+  working correctly.
+
+## [2023-09-03]
+
+### Added
+
+- `nih_export_vst3!()` now also supports more than one plugin type argument,
+  just like `nih_export_clap!()`.
+
+### Fixed
+
+- The `nih_export_*!()` macros now use `$crate` to refer to NIH-plug itself,
+  which makes it possible to use the NIH-plug crate under a different name.
+
+## [2023-08-05]
+
+### Breaking changes
+
+- The minimum supported Rust version has been bumped to 1.70 so we can start
+  using `OnceCell` and `OnceLock` to phase out uses of `lazy_static`.
+
+### Added
+
+- `nih_export_clap!()` can now take more than one plugin type argument to allow
+  exporting more than one plugin from a single plugin library.
+
+## [2023-05-13]
+
+### Fixed
+
+- Removed the `Default` bound from the `SysExMessage::Buffer` type. This was a
+  leftover from an older design.
+
+## [2023-04-30]
+
+### Changed
+
+- Added debug assertions to make sure parameter ranges are valid. The minimum
+  value must always be lower than the maximum value and they cannot be equal.
+
+## [2023-04-27]
+
+### Changed
+
+- The `v2s_f32_rounded()` formatter now avoids returning negative zero values
+  for roundtripping reasons since -0.0 and 0.0 correspond to the same normalized
+  value.
+
+## [2023-04-24]
+
+### Breaking changes
+
+- `Plugin::editor()` and `Plugin::task_executor()` now take `&mut self` instead
+  of `&self` to make it easier to move data into these functions without
+  involving interior mutability.
+
+### Changed
+
+- The `Plugin` trait's documentation has been updated to better clarify the
+  structure and to more explicitly mention that the non-lifecycle methods are
+  called once immediately after creating the plugin object.
+
+### Fixed
+
+- The logger now uses the correct local time offset on Linux instead of
+  defaulting to UTC due to some implementation details of the underlying `time`
+  crate.
+- The buffer changes from March 31st broke the sample accurate automation
+  feature. This has now been fixed.
+
+## [2023-04-22]
+
+### Added
+
+- CLAP plugins can optionally declare pages of [remote
+  controls](https://github.com/free-audio/clap/blob/main/include/clap/ext/draft/remote-controls.h)
+  so DAWs can more automatically map pages of the plugin's parameters to
+  hardware controllers. This is currently a draft extension, so until the
+  extension is finalized host support may break at any moment.
+
+### Changed
+
+- The CLAP version has been updated to 1.1.8.
+- The prelude module now also re-exports the following:
+  - The `PluginApi` num.
+  - The `Transport` struct.
+
+### Fixed
+
+- The upgrade to CLAP 1.1.8 caused NIH-plug to switch from the draft version of
+  the voice info extension to the final version, fixing voice stacking with
+  recent versions of Bitwig.
+
+## [2023-04-05]
+
+### Breaking changes
+
+- The `nih_debug_assert*!()` macros are now upgraded to regular panicking
+  `debug_assert!()` macros during tests.
+- `SmoothingStyle::for_oversampling_factor()` has been removed in favor of a new
+  mechanism that allows the smmoothers to be aware of oversampling. A new
+  `Smoothingstyle::OversamplingAware(oversampling_times, style)` can be used to
+  wrap another `Smoothingstyle` to make it aware of an oversampling amount that
+  can change at runtime. The `oversampling_times` is an `Arc<AtomicF32>` that
+  indicates the current oversampling amount. This makes it possible to link
+  multiple parameters to the same oversampling amount, have different sets of
+  parameters run at different effective sample rates, and automatically update
+  those oversampling amounts/sample rate multipliers from a parameter callback.
+- As a consequence of the above change, `Smoothingstyle` is no longer `Copy`
+  since the `OversamplingAware` smoothing style contain an
+  `Arc<Smoothingstyle>`. It can still be `Clone`d.
+
+### Changed
+
+- The prelude module now also re-exports the `AtomicF32` type since it's needed
+  to use the new `Smoothingstyle::OversamplingAware`.
+
+## [2023-04-01]
+
+### Fixed
+
+- Auxiliary output buffers are now always zeroed out in case the host didn't do
+  this for us. This was a regression from before 2023-03-31.
+
+## [2023-03-31]
+
+### Changed
+
+- Buffer management has been completely rewritten so it can be shared among all
+  of NIH-plug's backends. This should not result in any noticeable changes, but
+  it should reduce the chances of backend-specific bugs when it comes to
+  interacting with audio buffers and it will make it simpler to implement buffer
+  management for new plugin APIs.
+
+### Fixed
+
+- When a main IO audio buffers has more output channels than input channels, the
+  excess output channels are now correctly filled with zeroes instead of
+  containing whatever data was left in the host's output buffers. As part of
+  this change NIH-plug's buffer management has been refactored to reuse the same
+  logic in all of its wrappers.
+- Any outstanding VST3 output events are now sent to the host during a parameter
+  flush.
+
 ## [2023-03-21]
 
 ### Changed

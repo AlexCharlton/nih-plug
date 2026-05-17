@@ -1,5 +1,5 @@
 // Spectral Compressor: an FFT based compressor
-// Copyright (C) 2021-2023 Robbert van der Helm
+// Copyright (C) 2021-2024 Robbert van der Helm
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -317,7 +317,7 @@ impl Plugin for SpectralCompressor {
         self.params.clone()
     }
 
-    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         editor::create(
             self.params.editor_state.clone(),
             editor::Data {
@@ -547,7 +547,7 @@ fn process_stft_main(
     channel_idx: usize,
     real_fft_buffer: &mut [f32],
     complex_fft_buffer: &mut [Complex32],
-    fft_plan: &mut Plan,
+    fft_plan: &Plan,
     window_function: &[f32],
     params: &SpectralCompressorParams,
     compressor_bank: &mut compressor_bank::CompressorBank,
@@ -601,7 +601,7 @@ fn process_stft_sidechain(
     channel_idx: usize,
     real_fft_buffer: &mut [f32],
     complex_fft_buffer: &mut [Complex32],
-    fft_plan: &mut Plan,
+    fft_plan: &Plan,
     window_function: &[f32],
     compressor_bank: &mut compressor_bank::CompressorBank,
     input_gain: f32,

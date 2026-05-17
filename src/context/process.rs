@@ -1,8 +1,7 @@
 //! A context passed during the process function.
 
 use super::PluginApi;
-use crate::midi::PluginNoteEvent;
-use crate::plugin::Plugin;
+use crate::prelude::{Plugin, PluginNoteEvent};
 
 /// Contains both context data and callbacks the plugin can use during processing. Most notably this
 /// is how a plugin sends and receives note events, gets transport information, and accesses
@@ -41,8 +40,9 @@ pub trait ProcessContext<P: Plugin> {
     /// Get information about the current transport position and status.
     fn transport(&self) -> &Transport;
 
-    /// Returns the next note event, if there is one. Use [`NoteEvent::timing()`] to get the event's
-    /// timing within the buffer. Only available when
+    /// Returns the next note event, if there is one. Use
+    /// [`NoteEvent::timing()`][crate::prelude::NoteEvent::timing()] to get the event's timing
+    /// within the buffer. Only available when
     /// [`Plugin::MIDI_INPUT`][crate::prelude::Plugin::MIDI_INPUT] is set.
     ///
     /// # Usage

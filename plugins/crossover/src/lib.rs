@@ -1,5 +1,5 @@
 // Crossover: clean crossovers as a multi-out plugin
-// Copyright (C) 2022-2023 Robbert van der Helm
+// Copyright (C) 2022-2024 Robbert van der Helm
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -114,15 +114,15 @@ impl CrossoverParams {
 
             // TODO: More sensible default frequencies
             crossover_1_freq: FloatParam::new("Crossover 1", 200.0, crossover_range)
-                .with_smoother(crossover_smoothing_style)
+                .with_smoother(crossover_smoothing_style.clone())
                 .with_value_to_string(crossover_value_to_string.clone())
                 .with_string_to_value(crossover_string_to_value.clone()),
             crossover_2_freq: FloatParam::new("Crossover 2", 1000.0, crossover_range)
-                .with_smoother(crossover_smoothing_style)
+                .with_smoother(crossover_smoothing_style.clone())
                 .with_value_to_string(crossover_value_to_string.clone())
                 .with_string_to_value(crossover_string_to_value.clone()),
             crossover_3_freq: FloatParam::new("Crossover 3", 5000.0, crossover_range)
-                .with_smoother(crossover_smoothing_style)
+                .with_smoother(crossover_smoothing_style.clone())
                 .with_value_to_string(crossover_value_to_string.clone())
                 .with_string_to_value(crossover_string_to_value.clone()),
             crossover_4_freq: FloatParam::new("Crossover 4", 10000.0, crossover_range)
@@ -392,6 +392,21 @@ impl ClapPlugin for Crossover {
         ClapFeature::Stereo,
         ClapFeature::Utility,
     ];
+
+    fn remote_controls(&self, context: &mut impl RemoteControlsContext) {
+        context.add_section("Main", |section| {
+            section.add_page("Main", |page| {
+                page.add_param(&self.params.num_bands);
+                page.add_param(&self.params.crossover_type);
+                page.add_spacer();
+                page.add_spacer();
+                page.add_param(&self.params.crossover_1_freq);
+                page.add_param(&self.params.crossover_2_freq);
+                page.add_param(&self.params.crossover_3_freq);
+                page.add_param(&self.params.crossover_4_freq);
+            })
+        })
+    }
 }
 
 impl Vst3Plugin for Crossover {

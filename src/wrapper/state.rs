@@ -1,4 +1,4 @@
-//! Utilities for saving a [crate::plugin::Plugin]'s state. The actual state object is also exposed
+//! Utilities for saving a [`crate::plugin::Plugin`]'s state. The actual state object is also exposed
 //! to plugins through the [`GuiContext`][crate::prelude::GuiContext].
 
 use anyhow::{Context, Result};
@@ -6,10 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use crate::audio_setup::BufferConfig;
-use crate::params::internals::ParamPtr;
-use crate::params::{Param, ParamMut, Params};
-use crate::plugin::Plugin;
+use crate::params::ParamMut;
+use crate::prelude::{BufferConfig, Param, ParamPtr, Params, Plugin};
 
 // These state objects are also exposed directly to the plugin so it can do its own internal preset
 // management

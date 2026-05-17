@@ -2,13 +2,10 @@ use std::sync::Arc;
 
 use super::backend::Backend;
 use super::wrapper::{Task, Wrapper};
-use crate::context::gui::GuiContext;
-use crate::context::init::InitContext;
-use crate::context::process::{ProcessContext, Transport};
-use crate::context::PluginApi;
-use crate::midi::PluginNoteEvent;
-use crate::params::internals::ParamPtr;
-use crate::plugin::Plugin;
+use crate::prelude::{
+    GuiContext, InitContext, ParamPtr, Plugin, PluginApi, PluginNoteEvent, ProcessContext,
+    Transport,
+};
 
 /// An [`InitContext`] implementation for the standalone wrapper.
 pub(crate) struct WrapperInitContext<'a, P: Plugin, B: Backend<P>> {
@@ -17,7 +14,7 @@ pub(crate) struct WrapperInitContext<'a, P: Plugin, B: Backend<P>> {
 
 /// A [`ProcessContext`] implementation for the standalone wrapper. This is a separate object so it
 /// can hold on to lock guards for event queues. Otherwise reading these events would require
-/// constant unnecessary atomic operations to lock the uncontested RwLocks.
+/// constant unnecessary atomic operations to lock the uncontested `RwLock`s.
 pub(crate) struct WrapperProcessContext<'a, P: Plugin, B: Backend<P>> {
     #[allow(dead_code)]
     pub(super) wrapper: &'a Wrapper<P, B>,

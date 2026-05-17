@@ -1,38 +1,60 @@
-//! Traits and structs describing plugins and editors.
+//! Traits and structs describing plugins and editors. This includes extension structs for features
+//! that are specific to one or more plugin-APIs.
 
 use std::sync::Arc;
 
-use crate::audio_setup::{AudioIOLayout, AuxiliaryBuffers, BufferConfig};
-use crate::buffer::Buffer;
-use crate::context::gui::AsyncExecutor;
-use crate::context::init::InitContext;
-use crate::context::process::ProcessContext;
-use crate::editor::Editor;
-use crate::midi::sysex::SysExMessage;
-use crate::midi::MidiConfig;
-use crate::params::Params;
-use crate::wrapper::clap::features::ClapFeature;
-use crate::wrapper::state::PluginState;
+use crate::prelude::{
+    AsyncExecutor, AudioIOLayout, AuxiliaryBuffers, Buffer, BufferConfig, Editor, InitContext,
+    MidiConfig, Params, PluginState, ProcessContext, SysExMessage,
+};
+
+pub mod clap;
 #[cfg(feature = "vst3")]
-pub use crate::wrapper::vst3::subcategories::Vst3SubCategory;
+pub mod vst3;
 
 /// A function that can execute a plugin's [`BackgroundTask`][Plugin::BackgroundTask]s. A plugin can
 /// dispatch these tasks from the `initialize()` function, the `process()` function, or the GUI, so
 /// they can be deferred for later to avoid blocking realtime contexts.
 pub type TaskExecutor<P> = Box<dyn Fn(<P as Plugin>::BackgroundTask) + Send>;
 
-/// Basic functionality that needs to be implemented by a plugin. The wrappers will use this to
-/// expose the plugin in a particular plugin format.
+/// The main plugin trait covering functionality common across most plugin formats. Most formats
+/// also have another trait with more specific data and functionality that needs to be implemented
+/// before the plugin can be exported to that format. The wrappers will use this to expose the
+/// plugin in a particular plugin format.
+///
+/// NIH-plug is semi-declarative, meaning that most information about a plugin is defined
+/// declaratively but it also doesn't shy away from maintaining state when that is the path of least
+/// resistance. As such, the definitions on this trait fall in one of the following classes:
+///
+/// - `Plugin` objects are stateful. During their lifetime the plugin API wrappers will call the
+///   various lifecycle methods defined below, with the `initialize()`, `reset()`, and `process()`
+///   functions being the most important ones.
+/// - Most of the rest of the trait statically describes the plugin. You will find this done in
+///   three different ways:
+///   - Most of this data, including the supported audio IO layouts, is simple enough that it can be
+///     defined through compile-time constants.
+///   - Some of the data is queried through a method as doing everything at compile time would
+///     impose a lot of restrictions on code structure and meta programming without any real
+///     benefits. In those cases the trait defines a method that is queried once and only once,
+///     immediately after instantiating the `Plugin` through `Plugin::default()`. Examples of these
+///     methods are [`Plugin::params()`], and
+///     [`ClapPlugin::remote_controls()`][clap::ClapPlugin::remote_controls()].
+///   - Some of the data is defined through associated types. Rust currently sadly does not support
+///     default values for associated types, but all of these types can be set to `()` if you wish
+///     to ignore them. Examples of these types are [`Plugin::SysExMessage`] and
+///     [`Plugin::BackgroundTask`].
+/// - Finally, there are some functions that return extension structs and handlers, similar to how
+///   the `params()` function returns a data structure describing the plugin's parameters. Examples
+///   of these are the [`Plugin::editor()`] and [`Plugin::task_executor()`] functions, and they're
+///   also called once and only once after the plugin object has been created. This allows the audio
+///   thread to have exclusive access to the `Plugin` object, and it makes it easier to compose
+///   these extension structs since they're more loosely coupled to a specific `Plugin`
+///   implementation.
 ///
 /// The main thing you need to do is define a `[Params]` struct containing all of your parameters.
 /// See the trait's documentation for more information on how to do that, or check out the examples.
-/// Most of the other functionality is optional and comes with default trait method implementations.
-///
-/// Some notable not yet implemented features include:
-///
-/// - MIDI2 for CLAP, note expressions, polyphonic modulation and MIDI1, and MIDI SysEx are already
-///   supported
-/// - Audio thread thread pools (with host integration in CLAP)
+/// The plugin also needs a `Default` implementation so it can be initialized. Most of the other
+/// functionality is optional and comes with default trait method implementations.
 #[allow(unused_variables)]
 pub trait Plugin: Default + Send + 'static {
     /// The plugin's name.
@@ -98,7 +120,9 @@ pub trait Plugin: Default + Send + 'static {
     /// The plugin's SysEx message type if it supports sending or receiving MIDI SysEx messages, or
     /// `()` if it does not. This type can be a struct or enum wrapping around one or more message
     /// types, and the [`SysExMessage`] trait is then used to convert between this type and basic
-    /// byte buffers.
+    /// byte buffers. The [`MIDI_INPUT`][Self::MIDI_INPUT] and [`MIDI_OUTPUT`][Self::MIDI_OUTPUT]
+    /// fields need to be set to [`MidiConfig::Basic`] or above to be able to send and receive
+    /// SysEx.
     type SysExMessage: SysExMessage;
 
     /// A type encoding the different background tasks this plugin wants to run, or `()` if it
@@ -109,25 +133,36 @@ pub trait Plugin: Default + Send + 'static {
     // NOTE: Sadly it's not yet possible to default this and the `async_executor()` function to
     //       `()`: https://github.com/rust-lang/rust/issues/29661
     type BackgroundTask: Send;
-    /// A function that executes the plugin's tasks. Queried once when the plugin instance is
-    /// created. See [`BackgroundTask`][Self::BackgroundTask].
-    fn task_executor(&self) -> TaskExecutor<Self> {
+    /// A function that executes the plugin's tasks. When implementing this you will likely want to
+    /// pattern match on the task type, and then send any resulting data back over a channel or
+    /// triple buffer. See [`BackgroundTask`][Self::BackgroundTask].
+    ///
+    /// Queried only once immediately after the plugin instance is created. This function takes
+    /// `&mut self` to make it easier to move data into the closure.
+    fn task_executor(&mut self) -> TaskExecutor<Self> {
         // In the default implementation we can simply ignore the value
         Box::new(|_| ())
     }
 
     /// The plugin's parameters. The host will update the parameter values before calling
-    /// `process()`. These parameters are identified by strings that should never change when the
-    /// plugin receives an update.
+    /// `process()`. These string parameter IDs parameters should never change as they are used to
+    /// distinguish between parameters.
+    ///
+    /// Queried only once immediately after the plugin instance is created.
     fn params(&self) -> Arc<dyn Params>;
 
-    /// The plugin's editor, if it has one. The actual editor instance is created in
-    /// [`Editor::spawn()`]. A plugin editor likely wants to interact with the plugin's parameters
-    /// and other shared data, so you'll need to move [`Arc`] pointing to any data you want to
-    /// access into the editor. You can later modify the parameters through the
-    /// [`GuiContext`][crate::prelude::GuiContext] and [`ParamSetter`][crate::prelude::ParamSetter] after the editor
-    /// GUI has been created.
-    fn editor(&self, async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    /// Returns an extension struct for interacting with the plugin's editor, if it has one. Later
+    /// the host may call [`Editor::spawn()`] to create an editor instance. To read the current
+    /// parameter values, you will need to clone and move the `Arc` containing your `Params` object
+    /// into the editor. You can later modify the parameters through the
+    /// [`GuiContext`][crate::prelude::GuiContext] and [`ParamSetter`][crate::prelude::ParamSetter]
+    /// after the editor GUI has been created. NIH-plug comes with wrappers for several common GUI
+    /// frameworks that may have their own ways of interacting with parameters. See the repo's
+    /// readme for more information.
+    ///
+    /// Queried only once immediately after the plugin instance is created. This function takes
+    /// `&mut self` to make it easier to move data into the `Editor` implementation.
+    fn editor(&mut self, async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         None
     }
 
@@ -219,73 +254,12 @@ pub trait Plugin: Default + Send + 'static {
     fn deactivate(&mut self) {}
 }
 
-/// Provides auxiliary metadata needed for a CLAP plugin.
-pub trait ClapPlugin: Plugin {
-    /// A unique ID that identifies this particular plugin. This is usually in reverse domain name
-    /// notation, e.g. `com.manufacturer.plugin-name`.
-    const CLAP_ID: &'static str;
-    /// An optional short description for the plugin.
-    const CLAP_DESCRIPTION: Option<&'static str>;
-    /// The URL to the plugin's manual, if available.
-    const CLAP_MANUAL_URL: Option<&'static str>;
-    /// The URL to the plugin's support page, if available.
-    const CLAP_SUPPORT_URL: Option<&'static str>;
-    /// Keywords describing the plugin. The host may use this to classify the plugin in its plugin
-    /// browser.
-    const CLAP_FEATURES: &'static [ClapFeature];
-
-    /// If set, this informs the host about the plugin's capabilities for polyphonic modulation.
-    const CLAP_POLY_MODULATION_CONFIG: Option<PolyModulationConfig> = None;
-}
-
-/// Provides auxiliary metadata needed for a VST3 plugin.
-#[cfg(feature = "vst3")]
-pub trait Vst3Plugin: Plugin {
-    /// The unique class ID that identifies this particular plugin. You can use the
-    /// `*b"fooofooofooofooo"` syntax for this.
-    ///
-    /// This will be shuffled into a different byte order on Windows for project-compatibility.
-    const VST3_CLASS_ID: [u8; 16];
-    /// One or more subcategories. The host may use these to categorize the plugin. Internally this
-    /// slice will be converted to a string where each character is separated by a pipe character
-    /// (`|`). This string has a limit of 127 characters, and anything longer than that will be
-    /// truncated.
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory];
-
-    /// [`VST3_CLASS_ID`][Self::VST3_CLASS_ID`] in the correct order for the current platform so
-    /// projects and presets can be shared between platforms. This should not be overridden.
-    const PLATFORM_VST3_CLASS_ID: [u8; 16] = swap_vst3_uid_byte_order(Self::VST3_CLASS_ID);
-}
-
-#[cfg(all(feature = "vst3", not(target_os = "windows")))]
-const fn swap_vst3_uid_byte_order(uid: [u8; 16]) -> [u8; 16] {
-    uid
-}
-
-#[cfg(all(feature = "vst3", target_os = "windows"))]
-const fn swap_vst3_uid_byte_order(mut uid: [u8; 16]) -> [u8; 16] {
-    // No mutable references in const functions, so we can't use `uid.swap()`
-    let original_uid = uid;
-
-    uid[0] = original_uid[3];
-    uid[1] = original_uid[2];
-    uid[2] = original_uid[1];
-    uid[3] = original_uid[0];
-
-    uid[4] = original_uid[5];
-    uid[5] = original_uid[4];
-    uid[6] = original_uid[7];
-    uid[7] = original_uid[6];
-
-    uid
-}
-
 /// Indicates the current situation after the plugin has processed audio.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessStatus {
     /// Something went wrong while processing audio.
     Error(&'static str),
-    /// The plugin has finished processing audio. When the input is silent, the most may suspend the
+    /// The plugin has finished processing audio. When the input is silent, the host may suspend the
     /// plugin to save resources as it sees fit.
     Normal,
     /// The plugin has a (reverb) tail with a specific length in samples.
@@ -294,16 +268,4 @@ pub enum ProcessStatus {
     /// and should thus not be deactivated by the host. This is essentially the same as having an
     /// infinite tail.
     KeepAlive,
-}
-
-/// Configuration for the plugin's polyphonic modulation options, if it supports .
-pub struct PolyModulationConfig {
-    /// The maximum number of voices this plugin will ever use. Call the context's
-    /// `set_current_voice_capacity()` method during initialization or audio processing to set the
-    /// polyphony limit.
-    pub max_voice_capacity: u32,
-    /// If set to `true`, then the host may send note events for the same channel and key, but using
-    /// different voice IDs. Bitwig Studio, for instance, can use this to do voice stacking. After
-    /// enabling this, you should always prioritize using voice IDs to map note events to voices.
-    pub supports_overlapping_voices: bool,
 }

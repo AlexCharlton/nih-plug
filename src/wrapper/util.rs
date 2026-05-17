@@ -5,8 +5,18 @@ use std::os::raw::c_char;
 
 use crate::util::permit_alloc;
 
+pub(crate) mod buffer_management;
 #[cfg(debug_assertions)]
 pub(crate) mod context_checks;
+
+/// The bit that controls flush-to-zero behavior for denormals in 32 and 64-bit floating point
+/// numbers on x86 family architectures. Rust 1.75 deprecated the built in functions for controlling
+/// these registers. As listed in section 10.2.3.3 (Flush-To-Zero), bit 15 of the MXCSR register
+/// controls the FTZ behavior.
+///
+/// <https://cdrdv2-public.intel.com/843823/252046-sdm-change-document-1.pdf>
+#[cfg(target_feature = "sse")]
+const SSE_FTZ_BIT: u32 = 1 << 15;
 
 /// The bit that controls flush-to-zero behavior for denormals in 32 and 64-bit floating point
 /// numbers on AArch64.
@@ -17,7 +27,7 @@ const AARCH64_FTZ_BIT: u64 = 1 << 24;
 
 #[cfg(all(
     debug_assertions,
-    physical_sizefeature = "assert_process_allocs",
+    feature = "assert_process_allocs",
     all(windows, target_env = "gnu")
 ))]
 compile_error!("The 'assert_process_allocs' feature does not work correctly in combination with the 'x86_64-pc-windows-gnu' target, see https://github.com/Windfisch/rust-assert-no-alloc/issues/7");
@@ -101,7 +111,6 @@ pub fn clamp_output_event_timing(timing: u32, total_buffer_len: u32) -> u32 {
 /// - A file path, in which case the output gets appended to the end of that file which will be
 ///   created if necessary.
 pub fn setup_logger() {
-    // If opening the file fails, then we'll log to STDERR anyways, hence this closure
     let log_level = if cfg!(debug_assertions) {
         log::LevelFilter::Trace
     } else {
@@ -110,7 +119,8 @@ pub fn setup_logger() {
 
     let logger_builder = nih_log::LoggerBuilder::new(log_level)
         .filter_module("cosmic_text::buffer")
-        .filter_module("cosmic_text::shape");
+        .filter_module("cosmic_text::shape")
+        .filter_module("selectors::matching");
 
     // Always show the module in debug builds, makes it clearer where messages are coming from and
     // it helps set up filters
@@ -202,19 +212,30 @@ struct ScopedFtz {
 
 impl ScopedFtz {
     fn enable() -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(target_feature = "sse")] {
-                let mode = unsafe { std::arch::x86_64::_MM_GET_FLUSH_ZERO_MODE() };
-                let should_disable_again = mode != std::arch::x86_64::_MM_FLUSH_ZERO_ON;
+        #[cfg(not(miri))]
+        {
+            #[cfg(target_feature = "sse")]
+            {
+                // Rust 1.75 deprecated `_mm_setcsr()` and `_MM_SET_FLUSH_ZERO_MODE()`, so this now
+                // requires inline assembly. See sections 10.2.3 (MXCSR Control and Status Register)
+                // and 10.2.3.3 (Flush-To-Zero) from this document for more details:
+                //
+                // <https://cdrdv2-public.intel.com/843823/252046-sdm-change-document-1.pdf>
+                let mut mxcsr: u32 = 0;
+                unsafe { std::arch::asm!("stmxcsr [{}]", in(reg) &mut mxcsr) };
+                let should_disable_again = mxcsr & SSE_FTZ_BIT == 0;
                 if should_disable_again {
-                    unsafe { std::arch::x86_64::_MM_SET_FLUSH_ZERO_MODE(std::arch::x86_64::_MM_FLUSH_ZERO_ON) };
+                    unsafe { std::arch::asm!("ldmxcsr [{}]", in(reg) &(mxcsr | SSE_FTZ_BIT)) };
                 }
 
-                Self {
+                return Self {
                     should_disable_again,
                     _send_sync_marker: PhantomData,
-                }
-            } else if #[cfg(target_arch = "aarch64")] {
+                };
+            }
+
+            #[cfg(target_arch = "aarch64")]
+            {
                 // There are no convient intrinsics to change the FTZ settings on AArch64, so this
                 // requires inline assembly:
                 // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/FPCR--Floating-point-Control-Register
@@ -226,32 +247,38 @@ impl ScopedFtz {
                     unsafe { std::arch::asm!("msr fpcr, {}", in(reg) fpcr | AARCH64_FTZ_BIT) };
                 }
 
-                Self {
+                return Self {
                     should_disable_again,
                     _send_sync_marker: PhantomData,
-                }
-            } else {
-                Self {
-                    should_disable_again: false,
-                    _send_sync_marker: PhantomData,
-                }
+                };
             }
+        }
+
+        #[allow(unreachable_code)] // This is only unreachable if on SSE or aarch64
+        Self {
+            should_disable_again: false,
+            _send_sync_marker: PhantomData,
         }
     }
 }
 
 impl Drop for ScopedFtz {
     fn drop(&mut self) {
+        #[cfg(not(miri))]
         if self.should_disable_again {
-            cfg_if::cfg_if! {
-                if #[cfg(target_feature = "sse")] {
-                    unsafe { std::arch::x86_64::_MM_SET_FLUSH_ZERO_MODE(std::arch::x86_64::_MM_FLUSH_ZERO_OFF) };
-                } else if #[cfg(target_arch = "aarch64")] {
-                    let mut fpcr: u64;
-                    unsafe { std::arch::asm!("mrs {}, fpcr", out(reg) fpcr) };
-                    unsafe { std::arch::asm!("msr fpcr, {}", in(reg) fpcr & !AARCH64_FTZ_BIT) };
-                }
-            };
+            #[cfg(target_feature = "sse")]
+            {
+                let mut mxcsr: u32 = 0;
+                unsafe { std::arch::asm!("stmxcsr [{}]", in(reg) &mut mxcsr) };
+                unsafe { std::arch::asm!("ldmxcsr [{}]", in(reg) &(mxcsr & !SSE_FTZ_BIT)) };
+            }
+
+            #[cfg(target_arch = "aarch64")]
+            {
+                let mut fpcr: u64;
+                unsafe { std::arch::asm!("mrs {}, fpcr", out(reg) fpcr) };
+                unsafe { std::arch::asm!("msr fpcr, {}", in(reg) fpcr & !AARCH64_FTZ_BIT) };
+            }
         }
     }
 }
