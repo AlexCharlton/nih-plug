@@ -2,6 +2,13 @@ use nih_plug::prelude::*;
 use std::f32::consts;
 use std::sync::Arc;
 
+/// Tasks dispatched from realtime contexts and executed on a background thread via
+/// [`Plugin::task_executor`].
+#[derive(Clone, Copy)]
+pub enum SineBackgroundTask {
+    LogNote { note: u8, frequency: f32 },
+}
+
 /// A test tone generator that can either generate a sine wave based on the plugin's parameters or
 /// based on the current MIDI input.
 pub struct Sine {
@@ -123,7 +130,15 @@ impl Plugin for Sine {
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
     type SysExMessage = ();
-    type BackgroundTask = ();
+    type BackgroundTask = SineBackgroundTask;
+
+    fn task_executor(&mut self) -> TaskExecutor<Self> {
+        Box::new(|task| match task {
+            SineBackgroundTask::LogNote { note, frequency } => {
+                println!("Background: MIDI note {note} ({frequency:.1} Hz)");
+            }
+        })
+    }
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
@@ -171,6 +186,12 @@ impl Plugin for Sine {
                             self.midi_note_id = note;
                             self.midi_note_freq = util::midi_note_to_freq(note);
                             self.midi_note_gain.set_target(self.sample_rate, velocity);
+
+                            // Non-blocking: the audio thread only enqueues the task.
+                            context.execute_background(SineBackgroundTask::LogNote {
+                                note,
+                                frequency: self.midi_note_freq,
+                            });
                         }
                         NoteEvent::NoteOff { note, .. } if note == self.midi_note_id => {
                             self.midi_note_gain.set_target(self.sample_rate, 0.0);
