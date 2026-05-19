@@ -25,7 +25,7 @@ use crate::prelude::{Editor, ParentWindowHandle};
 use {
     crossbeam::queue::ArrayQueue,
     libc,
-    crate::event_loop::TASK_QUEUE_CAPACITY,
+    crate::event_loop::{EventLoop, MainThreadExecutor, TASK_QUEUE_CAPACITY},
 };
 
 /// FIXME: We need a separate wrapper type because we cannot conditionally define fields with

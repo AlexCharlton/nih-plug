@@ -403,10 +403,14 @@ impl<P: Vst3Plugin> IComponentTrait for Wrapper<P> {
         let mut current_pos = 0;
         let mut eof_pos = 0;
         if state.tell(&mut current_pos) != kResultOk
-            || state.seek(0, IBStream_::IStreamSeekMode_::kIBSeekEnd, &mut eof_pos) != kResultOk
+            || state.seek(
+                0,
+                IBStream_::IStreamSeekMode_::kIBSeekEnd as i32,
+                &mut eof_pos,
+            ) != kResultOk
             || state.seek(
                 current_pos,
-                IBStream_::IStreamSeekMode_::kIBSeekSet,
+                IBStream_::IStreamSeekMode_::kIBSeekSet as i32,
                 std::ptr::null_mut(),
             ) != kResultOk
         {
@@ -838,7 +842,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
     }
 
     unsafe fn canProcessSampleSize(&self, symbolic_sample_size: i32) -> tresult {
-        if symbolic_sample_size == SymbolicSampleSizes_::kSample32 as SymbolicSampleSizes {
+        if symbolic_sample_size == SymbolicSampleSizes_::kSample32 as i32 {
             kResultOk
         } else {
             kResultFalse
@@ -856,7 +860,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
         let setup = &*setup;
         nih_debug_assert_eq!(
             setup.symbolicSampleSize,
-            SymbolicSampleSizes_::kSample32 as SymbolicSampleSizes
+            SymbolicSampleSizes_::kSample32 as i32
         );
 
         // This is needed when activating the plugin and when restoring state
@@ -868,9 +872,9 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
         }));
 
         let mode = match setup.processMode {
-            n if n == ProcessModes_::kRealtime as ProcessModes => ProcessMode::Realtime,
-            n if n == ProcessModes_::kPrefetch as ProcessModes => ProcessMode::Buffered,
-            n if n == ProcessModes_::kOffline as ProcessModes => ProcessMode::Offline,
+            n if n == ProcessModes_::kRealtime as i32 => ProcessMode::Realtime,
+            n if n == ProcessModes_::kPrefetch as i32 => ProcessMode::Buffered,
+            n if n == ProcessModes_::kOffline as i32 => ProcessMode::Offline,
             n => {
                 nih_debug_assert_failure!("Unknown rendering mode '{}', defaulting to realtime", n);
                 ProcessMode::Realtime
@@ -937,7 +941,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
             nih_debug_assert!(data.numInputs >= 0 && data.numOutputs >= 0);
             nih_debug_assert_eq!(
                 data.symbolicSampleSize,
-                SymbolicSampleSizes_::kSample32 as SymbolicSampleSizes
+                SymbolicSampleSizes_::kSample32 as i32
             );
             nih_debug_assert!(data.numSamples >= 0);
 
