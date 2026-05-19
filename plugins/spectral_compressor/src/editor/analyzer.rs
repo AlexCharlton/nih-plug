@@ -62,7 +62,7 @@ impl Analyzer {
         cx: &mut Context,
         analyzer_data: LAnalyzerData,
         sample_rate: LRate,
-    ) -> Handle<Self>
+    ) -> Handle<'_, Self>
     where
         LAnalyzerData: Lens<Target = Arc<Mutex<triple_buffer::Output<AnalyzerData>>>>,
         LRate: Lens<Target = Arc<AtomicF32>>,
@@ -207,10 +207,10 @@ fn draw_spectrum(
     // The mesh path starts at the bottom left, follows the top envelope of the spectrum analyzer,
     // and ends in the bottom right
     let mut mesh_path = vg::Path::new();
-    let mesh_start_x_coordiante = bounds.x + (bounds.w * bin_t(mesh_bin_start_idx as f32));
+    let mesh_start_x_coordinate = bounds.x + (bounds.w * bin_t(mesh_bin_start_idx as f32));
     let mesh_start_y_coordinate = bounds.y + bounds.h;
 
-    mesh_path.move_to(mesh_start_x_coordiante, mesh_start_y_coordinate);
+    mesh_path.move_to(mesh_start_x_coordinate, mesh_start_y_coordinate);
     for (bin_idx, magnitude) in analyzer_data
         .envelope_followers
         .iter()
@@ -241,7 +241,7 @@ fn draw_spectrum(
     mesh_path.close();
 
     let mesh_paint = vg::Paint::linear_gradient_stops(
-        mesh_start_x_coordiante,
+        mesh_start_x_coordinate,
         0.0,
         previous_physical_x_coord,
         0.0,

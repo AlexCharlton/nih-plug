@@ -119,7 +119,7 @@ impl Plugin for Gain {
                         // NOTE: See `plugins/diopser/src/editor.rs` for an example using the generic UI widget
 
                         // This is a fancy widget that can get all the information it needs to properly
-                        // display and modify the parameter from the parametr itself
+                        // display and modify the parameter from the parameter itself
                         // It's not yet fully implemented, as the text is missing.
                         ui.label("Some random integer");
                         ui.add(widgets::ParamSlider::for_param(&params.some_int, setter));
@@ -131,7 +131,7 @@ impl Plugin for Gain {
                             "Also gain, but with a lame widget. Can't even render the value \
                              correctly!",
                         );
-                        // This is a simple naieve version of a parameter slider that's not aware of how
+                        // This is a simple naive version of a parameter slider that's not aware of how
                         // the parameters work
                         ui.add(
                             egui::widgets::Slider::from_get_set(-30.0..=30.0, |new_value| {

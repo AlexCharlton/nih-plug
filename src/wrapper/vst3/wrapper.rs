@@ -48,7 +48,6 @@ impl<P: Vst3Plugin> Wrapper<P> {
     }
 }
 
-
 impl<P: Vst3Plugin> IPluginBaseTrait for Wrapper<P> {
     unsafe fn initialize(&self, _context: *mut FUnknown) -> tresult {
         // We currently don't need or allow any initialization logic
@@ -72,11 +71,7 @@ impl<P: Vst3Plugin> IComponentTrait for Wrapper<P> {
         kResultOk
     }
 
-    unsafe fn getBusCount(
-        &self,
-        type_: MediaType,
-        dir: BusDirection,
-    ) -> i32 {
+    unsafe fn getBusCount(&self, type_: MediaType, dir: BusDirection) -> i32 {
         let current_audio_io_layout = self.inner.current_audio_io_layout.load();
 
         // A plugin has a main input and output bus if the default number of channels is non-zero,
@@ -512,11 +507,7 @@ impl<P: Vst3Plugin> IEditControllerTrait for Wrapper<P> {
         }
     }
 
-    unsafe fn getParameterInfo(
-        &self,
-        param_index: i32,
-        info: *mut ParameterInfo,
-    ) -> tresult {
+    unsafe fn getParameterInfo(&self, param_index: i32, info: *mut ParameterInfo) -> tresult {
         check_null_ptr!(info);
 
         if param_index < 0 || param_index > self.getParameterCount() {
@@ -545,7 +536,8 @@ impl<P: Vst3Plugin> IEditControllerTrait for Wrapper<P> {
             info.id = VST3_MIDI_PARAMS_START + midi_param_relative_idx;
             u16strlcpy(&mut info.title, &name);
             u16strlcpy(&mut info.shortTitle, &name);
-            info.flags = ParameterInfo_::ParameterFlags_::kIsReadOnly as i32 | (1 << 4); // kIsHidden
+            info.flags = ParameterInfo_::ParameterFlags_::kIsReadOnly as i32 | (1 << 4);
+        // kIsHidden
         } else {
             let param_hash = &self.inner.param_hashes[param_index as usize];
             let param_unit = &self
@@ -572,7 +564,8 @@ impl<P: Vst3Plugin> IEditControllerTrait for Wrapper<P> {
                 info.flags |= ParameterInfo_::ParameterFlags_::kCanAutomate as i32;
             }
             if hidden {
-                info.flags |= ParameterInfo_::ParameterFlags_::kIsReadOnly as i32 | (1 << 4); // kIsHidden
+                info.flags |= ParameterInfo_::ParameterFlags_::kIsReadOnly as i32 | (1 << 4);
+                // kIsHidden
             }
             if is_bypass {
                 info.flags |= ParameterInfo_::ParameterFlags_::kIsBypass as i32;
@@ -671,10 +664,7 @@ impl<P: Vst3Plugin> IEditControllerTrait for Wrapper<P> {
             .set_normalized_value_by_hash(id, value as f32, sample_rate)
     }
 
-    unsafe fn setComponentHandler(
-        &self,
-        handler: *mut IComponentHandler,
-    ) -> tresult {
+    unsafe fn setComponentHandler(&self, handler: *mut IComponentHandler) -> tresult {
         *self.inner.component_handler.borrow_mut() =
             unsafe { ComRef::from_raw(handler) }.map(|h| VstPtr::from(h.to_com_ptr()));
 
@@ -1125,7 +1115,9 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                 note: event.pitch as u8,
                                 pressure: event.pressure,
                             }));
-                        } else if event.r#type == Event_::EventTypes_::kNoteExpressionValueEvent as u16 {
+                        } else if event.r#type
+                            == Event_::EventTypes_::kNoteExpressionValueEvent as u16
+                        {
                             let event = event.__field0.noteExpressionValue;
                             match note_expression_controller.translate_event(timing, &event) {
                                 Some(translated_event) => {
@@ -1226,7 +1218,7 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                     let block_len = block_end - block_start;
 
                     // The buffer manager preallocated buffer slices for all the IO and storage for
-                    // any axuiliary inputs.
+                    // any auxiliary inputs.
                     let mut buffer_manager = self.inner.buffer_manager.borrow_mut();
                     let buffers =
                         buffer_manager.create_buffers(block_start, block_len, |buffer_source| {
@@ -1236,8 +1228,10 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                 && has_main_output
                             {
                                 let audio_output = &*data.outputs;
-                                let ptrs =
-                                    NonNull::new(audio_output.__field0.channelBuffers32 as *mut *mut f32).unwrap();
+                                let ptrs = NonNull::new(
+                                    audio_output.__field0.channelBuffers32 as *mut *mut f32,
+                                )
+                                .unwrap();
                                 let num_channels = audio_output.numChannels as usize;
 
                                 *buffer_source.main_output_channel_pointers =
@@ -1250,8 +1244,10 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                 && has_main_input
                             {
                                 let audio_input = &*data.inputs;
-                                let ptrs =
-                                    NonNull::new(audio_input.__field0.channelBuffers32 as *mut *mut f32).unwrap();
+                                let ptrs = NonNull::new(
+                                    audio_input.__field0.channelBuffers32 as *mut *mut f32,
+                                )
+                                .unwrap();
                                 let num_channels = audio_input.numChannels as usize;
 
                                 *buffer_source.main_input_channel_pointers =
@@ -1270,7 +1266,9 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                     }
 
                                     let audio_input = &*data.inputs.add(aux_input_idx);
-                                    match NonNull::new(audio_input.__field0.channelBuffers32 as *mut *mut f32) {
+                                    match NonNull::new(
+                                        audio_input.__field0.channelBuffers32 as *mut *mut f32,
+                                    ) {
                                         Some(ptrs) => {
                                             let num_channels = audio_input.numChannels as usize;
 
@@ -1294,7 +1292,9 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                     }
 
                                     let audio_output = &*data.outputs.add(aux_output_idx);
-                                    match NonNull::new(audio_output.__field0.channelBuffers32 as *mut *mut f32) {
+                                    match NonNull::new(
+                                        audio_output.__field0.channelBuffers32 as *mut *mut f32,
+                                    ) {
                                         Some(ptrs) => {
                                             let num_channels = audio_output.numChannels as usize;
 
@@ -1551,7 +1551,8 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                 channel,
                                 pressure,
                             } if P::MIDI_OUTPUT >= MidiConfig::MidiCCs => {
-                                vst3_event.r#type = Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
+                                vst3_event.r#type =
+                                    Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
                                 vst3_event.__field0.midiCCOut = LegacyMIDICCOutEvent {
                                     controlNumber: 128, // kAfterTouch
                                     channel: channel as i8,
@@ -1566,7 +1567,8 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                             } if P::MIDI_OUTPUT >= MidiConfig::MidiCCs => {
                                 let scaled = (value * ((1 << 14) - 1) as f32).round() as i32;
 
-                                vst3_event.r#type = Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
+                                vst3_event.r#type =
+                                    Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
                                 vst3_event.__field0.midiCCOut = LegacyMIDICCOutEvent {
                                     controlNumber: 129, // kPitchBend
                                     channel: channel as i8,
@@ -1580,7 +1582,8 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                 cc,
                                 value,
                             } if P::MIDI_OUTPUT >= MidiConfig::MidiCCs => {
-                                vst3_event.r#type = Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
+                                vst3_event.r#type =
+                                    Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
                                 vst3_event.__field0.midiCCOut = LegacyMIDICCOutEvent {
                                     controlNumber: cc,
                                     channel: channel as i8,
@@ -1593,7 +1596,8 @@ impl<P: Vst3Plugin> IAudioProcessorTrait for Wrapper<P> {
                                 channel,
                                 program,
                             } if P::MIDI_OUTPUT >= MidiConfig::MidiCCs => {
-                                vst3_event.r#type = Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
+                                vst3_event.r#type =
+                                    Event_::EventTypes_::kLegacyMIDICCOutEvent as u16;
                                 vst3_event.__field0.midiCCOut = LegacyMIDICCOutEvent {
                                     controlNumber: 130, // kCtrlProgramChange
                                     channel: channel as i8,
@@ -1700,9 +1704,8 @@ impl<P: Vst3Plugin> IMidiMappingTrait for Wrapper<P> {
 
         // We reserve a contiguous parameter range right at the end of the allowed parameter indices
         // for these MIDI CC parameters
-        *param_id = VST3_MIDI_PARAMS_START
-            + midiControllerNumber as u32
-            + (channel as u32 * VST3_MIDI_CCS);
+        *param_id =
+            VST3_MIDI_PARAMS_START + midiControllerNumber as u32 + (channel as u32 * VST3_MIDI_CCS);
 
         kResultOk
     }
@@ -1823,11 +1826,7 @@ impl<P: Vst3Plugin> IUnitInfoTrait for Wrapper<P> {
         0
     }
 
-    unsafe fn getProgramListInfo(
-        &self,
-        _list_index: i32,
-        _info: *mut ProgramListInfo,
-    ) -> tresult {
+    unsafe fn getProgramListInfo(&self, _list_index: i32, _info: *mut ProgramListInfo) -> tresult {
         kInvalidArgument
     }
 

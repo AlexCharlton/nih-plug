@@ -550,7 +550,7 @@ fn load_bundler_config() -> Result<Option<BundlerConfig>> {
 
 /// Split the `xtask bundle` arguments into a list of packages and a list of other arguments. The
 /// package vector either contains just the first argument, or if the arguments iterator starts with
-/// one or more occurences of `-p <package>` then this will contain all those packages.
+/// one or more occurrences of `-p <package>` then this will contain all those packages.
 fn split_bundle_args(
     args: impl Iterator<Item = String>,
     usage_string: &str,

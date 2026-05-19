@@ -26,7 +26,7 @@ pub struct Sine {
     /// aftertouch.
     ///
     /// Smoothing is built into the parameters, but you can also use them manually if you need to
-    /// smooth soemthing that isn't a parameter.
+    /// smooth something that isn't a parameter.
     midi_note_gain: Smoother<f32>,
 }
 
@@ -173,7 +173,7 @@ impl Plugin for Sine {
             // Smoothing is optionally built into the parameters themselves
             let gain = self.params.gain.smoothed.next();
 
-            // This plugin can be either triggered by MIDI or controleld by a parameter
+            // This plugin can be either triggered by MIDI or controlled by a parameter
             let sine = if self.params.use_midi.value() {
                 // Act on the next MIDI event
                 while let Some(event) = next_event {

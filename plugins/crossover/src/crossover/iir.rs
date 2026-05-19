@@ -47,10 +47,10 @@ pub enum IirCrossoverType {
 /// low-pass and the high-pass parts of the crossover.
 #[derive(Debug, Clone, Default)]
 struct Crossover {
-    /// Filters for the low-pass section of the crossover. Not all filters may be used dependign on
+    /// Filters for the low-pass section of the crossover. Not all filters may be used depending on
     /// the crossover type.
     lp_filters: [Biquad<f32x2>; 2],
-    /// Filters for the high-pass section of the crossover. Not all filters may be used dependign on
+    /// Filters for the high-pass section of the crossover. Not all filters may be used depending on
     /// the crossover type.
     hp_filters: [Biquad<f32x2>; 2],
 }

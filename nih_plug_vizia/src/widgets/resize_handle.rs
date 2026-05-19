@@ -5,7 +5,7 @@ use vizia::vg;
 
 /// A resize handle placed at the bottom right of the window that lets you resize the window.
 ///
-/// Needs to be the last element in the GUI because of how event targetting in Vizia works right
+/// Needs to be the last element in the GUI because of how event targeting in Vizia works right
 /// now.
 pub struct ResizeHandle {
     /// Will be set to `true` if we're dragging the parameter. Resetting the parameter or entering a
@@ -25,7 +25,7 @@ pub struct ResizeHandle {
 impl ResizeHandle {
     /// Create a resize handle at the bottom right of the window. This should be created at the top
     /// level. Dragging this handle around will cause the window to be resized.
-    pub fn new(cx: &mut Context) -> Handle<Self> {
+    pub fn new(cx: &mut Context) -> Handle<'_, Self> {
         // Styling is done in the style sheet
         ResizeHandle {
             drag_active: false,
@@ -85,7 +85,7 @@ impl View for ResizeHandle {
                     // We need to convert our measurements into physical pixels relative to the
                     // initial drag to be able to keep a consistent ratio. This 'relative to the
                     // start' bit is important because otherwise we would be comparing the position
-                    // to the same absoltue screen spotion.
+                    // to the same absolute screen spotion.
                     // TODO: This may start doing fun things when the window grows so large that it
                     //       gets pushed upwards or leftwards
                     let (compensated_physical_x, compensated_physical_y) =

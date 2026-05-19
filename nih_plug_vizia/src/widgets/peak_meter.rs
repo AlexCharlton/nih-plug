@@ -39,7 +39,7 @@ where
 impl PeakMeter {
     /// Creates a new [`PeakMeter`] for the given value in decibel, optionally holding the peak
     /// value for a certain amount of time.
-    pub fn new<L>(cx: &mut Context, level_dbfs: L, hold_time: Option<Duration>) -> Handle<Self>
+    pub fn new<L>(cx: &mut Context, level_dbfs: L, hold_time: Option<Duration>) -> Handle<'_, Self>
     where
         L: Lens<Target = f32>,
     {
@@ -105,7 +105,7 @@ impl PeakMeter {
                                 .class("ticks__label")
                                 .class("ticks__label--inf")
                         } else if last_tick {
-                            // This is only inclued in the array to make positioning this easier
+                            // This is only included in the array to make positioning this easier
                             Label::new(cx, "dBFS")
                                 .class("ticks__label")
                                 .class("ticks__label--dbfs")
