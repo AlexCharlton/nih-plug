@@ -3,7 +3,7 @@ use std::cell::Cell;
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use vst3_sys::vst::IComponentHandler;
+use vst3::Steinberg::Vst::IComponentHandlerTrait;
 
 use crate::prelude::{
     GuiContext, InitContext, ParamPtr, PluginApi, PluginNoteEvent, PluginState, ProcessContext,
@@ -138,7 +138,7 @@ impl<P: Vst3Plugin> GuiContext for WrapperGuiContext<P> {
         match &*self.inner.component_handler.borrow() {
             Some(handler) => match self.inner.param_ptr_to_hash.get(&param) {
                 Some(hash) => {
-                    handler.begin_edit(*hash);
+                    handler.beginEdit(*hash);
                 }
                 None => nih_debug_assert_failure!("Unknown parameter: {:?}", param),
             },
@@ -179,7 +179,7 @@ impl<P: Vst3Plugin> GuiContext for WrapperGuiContext<P> {
                         );
                     }
 
-                    handler.perform_edit(*hash, normalized as f64);
+                    handler.performEdit(*hash, normalized as f64);
                 }
                 None => nih_debug_assert_failure!("Unknown parameter: {:?}", param),
             },
@@ -202,7 +202,7 @@ impl<P: Vst3Plugin> GuiContext for WrapperGuiContext<P> {
         match &*self.inner.component_handler.borrow() {
             Some(handler) => match self.inner.param_ptr_to_hash.get(&param) {
                 Some(hash) => {
-                    handler.end_edit(*hash);
+                    handler.endEdit(*hash);
                 }
                 None => nih_debug_assert_failure!("Unknown parameter: {:?}", param),
             },
