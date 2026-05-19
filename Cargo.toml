@@ -77,7 +77,7 @@ simd = []
 # state is still supported so existing state will still load after enabling this
 # feature for a plugin, but it can not be disabled again without losing state
 # compatibility.
-zstd = ["dep:zstd"]
+zstd = ["dep:rust-zstd"]
 
 # Only relevant when generating docs, adds the `doc_cfg` nightly feature
 docs = []
@@ -128,7 +128,7 @@ rtrb = { version = "0.2.2", optional = true }
 vst3 = { version = "0.3.0", optional = true }
 
 # Used for the `zstd` feature
-zstd = { version = "0.12.3", optional = true }
+rust-zstd = { version = "0.1.0", optional = true }
 
 [dev-dependencies]
 approx = "0.5.1"
