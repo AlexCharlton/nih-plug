@@ -22,6 +22,7 @@ use crate::prelude::{
 };
 use crate::util::permit_alloc;
 use crate::wrapper::state::{self, PluginState};
+use crate::wrapper::track_context::SharedTrackContext;
 use crate::wrapper::util::buffer_management::BufferManager;
 use crate::wrapper::util::{hash_param_id, process_wrapper};
 
@@ -138,6 +139,10 @@ pub(crate) struct WrapperInner<P: Vst3Plugin> {
     /// having to add a setter function to the parameter (or even worse, have it be completely
     /// untyped).
     pub param_ptr_to_hash: HashMap<ParamPtr, u32>,
+
+    /// The display name of the track/channel this plugin instance is on, when provided by the host
+    /// through VST3's channel context interface.
+    pub track_context: Arc<SharedTrackContext>,
 }
 
 /// Tasks that can be sent from the plugin to be executed on the main thread in a non-blocking
@@ -275,6 +280,8 @@ impl<P: Vst3Plugin> WrapperInner<P> {
             .map(|(_, hash, ptr, _)| (ptr, hash))
             .collect();
 
+        let track_context = SharedTrackContext::new();
+
         let wrapper = Arc::new(Self {
             plugin: Mutex::new(plugin),
             task_executor,
@@ -319,6 +326,7 @@ impl<P: Vst3Plugin> WrapperInner<P> {
             param_units,
             param_id_to_hash,
             param_ptr_to_hash,
+            track_context,
         });
 
         // FIXME: Right now this is safe, but if we are going to have a singleton main thread queue

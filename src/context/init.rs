@@ -34,4 +34,13 @@ pub trait InitContext<P: Plugin> {
     /// runtime allows the host to better optimize polyphonic modulation, or to switch to strictly
     /// monophonic modulation when dropping the capacity down to 1.
     fn set_current_voice_capacity(&self, capacity: u32);
+
+    /// Returns the display name of the track this plugin instance is on, if the host provides that
+    /// information.
+    ///
+    /// This uses the CLAP `clap.track-info` extension or VST3's channel context interface when
+    /// available. Standalone builds always return `None`.
+    fn track_name(&self) -> Option<String> {
+        None
+    }
 }

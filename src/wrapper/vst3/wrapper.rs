@@ -11,7 +11,8 @@ use widestring::U16CStr;
 use super::inner::{ProcessEvent, WrapperInner};
 use super::note_expressions::{self, NoteExpressionController};
 use super::util::{
-    u16strlcpy, VstPtr, VST3_MIDI_CCS, VST3_MIDI_NUM_PARAMS, VST3_MIDI_PARAMS_START,
+    channel_name_from_attribute_list, u16strlcpy, VstPtr, VST3_MIDI_CCS, VST3_MIDI_NUM_PARAMS,
+    VST3_MIDI_PARAMS_START,
 };
 use super::util::{VST3_MIDI_CHANNELS, VST3_MIDI_PARAMS_END};
 use super::view::WrapperView;
@@ -37,6 +38,7 @@ impl<P: Vst3Plugin> Class for Wrapper<P> {
         INoteExpressionController,
         IProcessContextRequirements,
         IUnitInfo,
+        ChannelContext::IInfoListener,
     );
 }
 
@@ -691,6 +693,15 @@ impl<P: Vst3Plugin> IEditControllerTrait for Wrapper<P> {
             }
             None => std::ptr::null_mut(),
         }
+    }
+}
+
+impl<P: Vst3Plugin> ChannelContext::IInfoListenerTrait for Wrapper<P> {
+    unsafe fn setChannelContextInfos(&self, list: *mut IAttributeList) -> tresult {
+        self.inner
+            .track_context
+            .set_name(channel_name_from_attribute_list(list));
+        kResultOk
     }
 }
 
