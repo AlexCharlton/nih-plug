@@ -378,6 +378,7 @@ impl<P: Vst3Plugin> IComponentTrait for Wrapper<P> {
                         audio_io_layout,
                     );
 
+                    self.inner.is_active.store(true, Ordering::SeqCst);
                     kResultOk
                 } else {
                     kResultFalse
@@ -385,6 +386,7 @@ impl<P: Vst3Plugin> IComponentTrait for Wrapper<P> {
             }
             (true, None) => kResultFalse,
             (false, _) => {
+                self.inner.is_active.store(false, Ordering::SeqCst);
                 self.inner.plugin.lock().deactivate();
 
                 kResultOk
@@ -698,9 +700,18 @@ impl<P: Vst3Plugin> IEditControllerTrait for Wrapper<P> {
 
 impl<P: Vst3Plugin> ChannelContext::IInfoListenerTrait for Wrapper<P> {
     unsafe fn setChannelContextInfos(&self, list: *mut IAttributeList) -> tresult {
-        self.inner
-            .track_context
-            .set_name(channel_name_from_attribute_list(list));
+        let Some(name) = channel_name_from_attribute_list(list) else {
+            return kResultOk;
+        };
+
+        self.inner.track_context.set_name(Some(name));
+
+        if self.inner.is_active.load(Ordering::SeqCst) {
+            let mut init_context = self.inner.make_init_context();
+            let mut plugin = self.inner.plugin.lock();
+            plugin.track_context_changed(&mut init_context);
+        }
+
         kResultOk
     }
 }

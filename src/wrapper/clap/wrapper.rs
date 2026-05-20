@@ -762,7 +762,7 @@ impl<P: ClapPlugin> Wrapper<P> {
         }
     }
 
-    fn refresh_track_info_from_host(&self) {
+    pub(crate) fn refresh_track_info_from_host(&self) {
         let host_track_info = self.host_track_info.borrow();
         let Some(host_track_info) = host_track_info.as_ref() else {
             return;
@@ -2393,6 +2393,12 @@ impl<P: ClapPlugin> Wrapper<P> {
         let wrapper = &*((*plugin).plugin_data as *const Self);
 
         wrapper.refresh_track_info_from_host();
+
+        if wrapper.current_buffer_config.load().is_some() {
+            let mut init_context = wrapper.make_init_context();
+            let mut plugin = wrapper.plugin.lock();
+            plugin.track_context_changed(&mut init_context);
+        }
     }
 
     unsafe extern "C" fn on_main_thread(plugin: *const clap_plugin) {

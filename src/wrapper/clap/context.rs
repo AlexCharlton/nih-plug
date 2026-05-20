@@ -90,6 +90,7 @@ impl<P: ClapPlugin> InitContext<P> for WrapperInitContext<'_, P> {
     }
 
     fn track_name(&self) -> Option<String> {
+        self.wrapper.refresh_track_info_from_host();
         self.wrapper.track_context.name()
     }
 }
@@ -244,6 +245,7 @@ impl<P: ClapPlugin> GuiContext for WrapperGuiContext<P> {
     }
 
     fn track_name(&self) -> Option<String> {
+        self.wrapper.refresh_track_info_from_host();
         self.wrapper.track_context.name()
     }
 }

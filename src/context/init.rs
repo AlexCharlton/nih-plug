@@ -40,6 +40,10 @@ pub trait InitContext<P: Plugin> {
     ///
     /// This uses the CLAP `clap.track-info` extension or VST3's channel context interface when
     /// available. Standalone builds always return `None`.
+    ///
+    /// Depending on the host, the name may only become available after [`initialize()`][crate::plugin::Plugin::initialize]
+    /// has returned. In that case, implement
+    /// [`Plugin::track_context_changed()`][crate::plugin::Plugin::track_context_changed].
     fn track_name(&self) -> Option<String> {
         None
     }
